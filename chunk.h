@@ -6,12 +6,14 @@
 #include <cstring>
 #include <string>
 
+#include "base.h"
+
 namespace csv {
 
 class MemoryChunk {
 public:
-  static constexpr size_t kStringCellSize = 64u;
-  static constexpr size_t kMaxStringLength = kStringCellSize - 1u;
+  static constexpr size_t kStringCellSize = FieldTypeHelper<FieldType::STRING>::size;
+  static constexpr size_t kMaxStringLength = kStringCellSize - 1;
 
   explicit MemoryChunk(size_t size) : buffer_(new char[size]), size_(size) {
     std::memset(reinterpret_cast<void *>(buffer_), 0, size_ * sizeof(char));
@@ -34,8 +36,7 @@ public:
   char *ReadCharPtr(int offset) const { return buffer_ + offset; }
   size_t ReadStrLength(int offset) const {
     return MemoryChunk::kMaxStringLength -
-           static_cast<size_t>(
-               *(buffer_ + offset + MemoryChunk::kMaxStringLength));
+           static_cast<size_t>(*(buffer_ + offset + MemoryChunk::kMaxStringLength));
   }
 
   void Write(int offset, int64_t value) {
@@ -44,7 +45,7 @@ public:
   void Write(int offset, double value) {
     std::memcpy(buffer_ + offset, &value, sizeof(double));
   }
-  void Write(int offset, const std::string& str) {
+  void Write(int offset, const std::string &str) {
     this->Write(offset, str.c_str(), str.size());
   }
   void Write(int offset, const char *str, size_t str_length) {
@@ -62,6 +63,6 @@ private:
   size_t size_;
 };
 
-} // namespace csv
+}  // namespace csv
 
 #endif

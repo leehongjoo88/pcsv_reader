@@ -3,17 +3,14 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <string>
+#include <numeric>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace csv {
 
-enum class FieldType {
-  INT64 = 0,
-  DOUBLE,
-  STRING,
-  END
-};
+enum class FieldType { INT64 = 0, DOUBLE, STRING, END };
 
 template <FieldType>
 struct FieldTypeHelper {
@@ -30,6 +27,12 @@ template <>
 struct FieldTypeHelper<FieldType::DOUBLE> {
   using type = double;
   static constexpr size_t size = sizeof(type);
+};
+
+template <>
+struct FieldTypeHelper<FieldType::STRING> {
+  using type = std::string;
+  static constexpr size_t size = 64;
 };
 
 template <typename T>
@@ -68,6 +71,24 @@ inline double Convert<double>(const char* str, size_t len) {
   return value;
 }
 
+inline size_t GetTotalFieldTypeSize(const std::vector<FieldType>& field_types) {
+  using IntHelper = FieldTypeHelper<FieldType::INT64>;
+  using DoubleHelper = FieldTypeHelper<FieldType::DOUBLE>;
+  using StringHelper = FieldTypeHelper<FieldType::STRING>;
+  auto size_getter = [](size_t sum, FieldType field_type) -> size_t {
+    switch (field_type) {
+    case FieldType::INT64:
+      return sum + IntHelper::size;
+    case FieldType::DOUBLE:
+      return sum + DoubleHelper::size;
+    case FieldType::STRING:
+      return sum + StringHelper::size;
+    default:
+      return sum;
+    }
+  };
+  return std::accumulate(std::begin(field_types), std::end(field_types), 0u, size_getter);
+}
 
 }  // namespace csv
 

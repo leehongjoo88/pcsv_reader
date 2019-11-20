@@ -49,3 +49,10 @@ add_test(
   NAME document_test
   COMMAND "document_test"
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
+
+add_executable(read_test read.cpp read_test.cpp)
+target_link_libraries(read_test gtest_main)
+add_test(
+  NAME read_test
+  COMMAND "read_test"
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
