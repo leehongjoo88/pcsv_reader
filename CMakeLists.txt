@@ -36,6 +36,8 @@ if (CMAKE_VERSION VERSION_LESS 2.8.11)
   include_directories("${gtest_SOURCE_DIR}/include")
 endif()
 
+add_executable(test_cli test.cpp read.cpp document.cpp)
+
 add_executable(chunk_test chunk_test.cpp)
 target_link_libraries(chunk_test gtest_main)
 add_test(
@@ -50,7 +52,7 @@ add_test(
   COMMAND "document_test"
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
 
-add_executable(read_test read.cpp read_test.cpp)
+add_executable(read_test read.cpp read_test.cpp document.cpp)
 target_link_libraries(read_test gtest_main)
 add_test(
   NAME read_test
