@@ -62,9 +62,14 @@ int main(int argc, char** argv) {
   watch.End();
 
   Stopwatch watch2("vector");
-  watch.Start();
+  watch2.Start();
   auto v = document.GetAsString("emp_length");
-  watch.End();
+  watch2.End();
+
+  watch2.Start();
+  auto iv = document.GetAsInt64("transaction_no");
+  watch2.End();
+
   std::cout << v.size() << std::endl;
   std::cout << v[0] << std::endl << v[1] << v[2] << std::endl;
 

@@ -4,6 +4,10 @@ set(CMAKE_CXX_STANDARD 11)
 
 project(CSVReader LANGUAGES CXX)
 
+find_package(OpenMP)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+
 # Download and unpack googletest at configure time
 configure_file(CMakeLists.txt.in googletest-download/CMakeLists.txt)
 execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -37,6 +41,9 @@ if (CMAKE_VERSION VERSION_LESS 2.8.11)
 endif()
 
 add_executable(test_cli test.cpp read.cpp document.cpp)
+if (OpenMp_CXX_FOUND)
+  target_link_libraries(test_cli PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 add_executable(chunk_test chunk_test.cpp)
 target_link_libraries(chunk_test gtest_main)
@@ -58,3 +65,6 @@ add_test(
   NAME read_test
   COMMAND "read_test"
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}")
+if (OpenMp_CXX_FOUND)
+  target_link_libraries(read_test PUBLIC OpenMP::OpenMP_CXX)
+endif()

@@ -1,5 +1,7 @@
 #include "read.h"
 
+#include <omp.h>
+
 #include <cassert>
 #include <cmath>
 #include <fstream>
@@ -43,9 +45,15 @@ bool FillLines(std::istream& file_in, std::vector<std::string>& line_buffer,
   size_t line_buffer_size = line_buffer.size();
   std::string line;
   num_read_lines = 0u;
-  for (auto line_no = 0u; read_bytes < kMaxChunkSize; ++line_no, ++num_read_lines) {
+
+  auto line_no = 0u;
+  while (read_bytes < kMaxChunkSize) {
     if (!std::getline(file_in, line)) {
       return true;
+    }
+
+    if (line.empty()) {
+      continue;
     }
 
     if (line_no >= line_buffer_size) {
@@ -53,7 +61,8 @@ bool FillLines(std::istream& file_in, std::vector<std::string>& line_buffer,
       line_buffer_size = line_buffer.size();
     }
 
-    line_buffer[line_no] = line;
+    line_buffer[line_no++] = line;
+    num_read_lines++;
     read_bytes += line.size();
   }
 
@@ -119,6 +128,7 @@ Document ReadCSV(const std::string& path, const std::vector<FieldType>& field_ty
 
   const char quotechar = '"';
   const char separator = ',';
+  const auto num_threads = 16u;
 
   bool process_done = false;
   size_t row_offset = 0u;
@@ -130,12 +140,14 @@ Document ReadCSV(const std::string& path, const std::vector<FieldType>& field_ty
     size_t num_read_lines = 0u;
     process_done = FillLines(file_in, lines, num_read_lines);
     doc.AddChunk(num_read_lines);
+    omp_set_num_threads(num_threads);
+#pragma omp parallel for schedule(dynamic)
     for (size_t row_no = row_offset; row_no < row_offset + num_read_lines; ++row_no) {
       int cell_start = 0;
       int cell_end = 0;
       bool quoted = false;
       size_t column = 0u;
-      const auto& line = lines[row_no];
+      const auto& line = lines[row_no - row_offset];
       const auto lineptr = line.c_str();
       if (line.empty()) {
         continue;

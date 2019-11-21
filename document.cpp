@@ -81,7 +81,7 @@ size_t Document::NumRows() const {
                          });
 }
 
-std::vector<int64_t> Document::GetAsInt64(const std::string &column) const {
+std::vector<int64_t> Document::GetAsInt64(const std::string& column) const {
   int column_index = -1;
   for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
     if (field_names_[idx] == column) {
@@ -94,11 +94,11 @@ std::vector<int64_t> Document::GetAsInt64(const std::string &column) const {
     throw std::invalid_argument(std::string("no column with name ") + column);
   }
 
-  const auto &column_info = column_infos_[column_index];
+  const auto& column_info = column_infos_[column_index];
   std::vector<int64_t> column_result(this->NumRows());
   const auto column_offset = column_info.offset;
   auto row_offset = 0u;
-  for (const auto &document_memory_chunk : buffer_) {
+  for (const auto& document_memory_chunk : buffer_) {
     auto current_chunk = document_memory_chunk.chunk.get();
     for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
       column_result[row + row_offset] =
