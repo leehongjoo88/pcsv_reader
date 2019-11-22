@@ -11,10 +11,21 @@
 
 namespace csv {
 
-std::vector<std::string> ColumnNames(std::istream& file_in, const std::string& path);
+struct ReadOptions {
+  char quotechar;
+  char separator;
+  int num_threads;
 
-Document ReadCSV(const std::string& path, const std::vector<FieldType>& field_types);
+  ReadOptions() : quotechar('"'), separator(','), num_threads(16) {}
+  ReadOptions(char quotechar, char separator, int num_threads)
+      : quotechar(quotechar), separator(separator), num_threads(num_threads) {}
+};
 
-}
+std::vector<std::string> ColumnNames(std::istream& file_in, const std::string& path,
+                                     ReadOptions options = ReadOptions());
+
+Document ReadCSV(const std::string& path, const std::vector<FieldType>& field_types,
+                 ReadOptions options = ReadOptions());
+}  // namespace csv
 
 #endif
