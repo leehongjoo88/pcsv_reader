@@ -114,4 +114,46 @@ TEST(TestDocument, TestTwoChunk) {
   EXPECT_EQ(24, ages[3]);
 }
 
+TEST(TestDocument, TestDump) {
+  csv::Document doc(std::vector<std::string>{"id", "name", "age", "grade"},
+                    std::vector<csv::FieldType>{
+                        csv::FieldType::INT64, csv::FieldType::STRING,
+                        csv::FieldType::INT64, csv::FieldType::DOUBLE});
+  doc.AddChunk(4);
+  // [0, "A", 20, 2.7]
+  doc.Write(0, 0, "0", 1);
+  doc.Write(0, 1, "A", 1);
+  doc.Write(0, 2, "20", 2);
+  doc.Write(0, 3, "2.7", 3);
+
+  // [1, "B", 19, 4.1]
+  doc.Write(1, 0, "1", 1);
+  doc.Write(1, 1, "B", 1);
+  doc.Write(1, 2, "19", 2);
+  doc.Write(1, 3, "4.1", 3);
+
+  // [2, "AB", 9, 4.12]
+  doc.Write(2, 0, "2", 1);
+  doc.Write(2, 1, "AB", 2);
+  doc.Write(2, 2, "9", 1);
+  doc.Write(2, 3, "4.12", 4);
+
+  // [3, "ABCD", 24, 3.1415]
+  doc.Write(3, 0, "3", 1);
+  doc.Write(3, 1, "ABCD", 4);
+  doc.Write(3, 2, "24", 2);
+  doc.Write(3, 3, "3.1415", 6);
+
+  std::ostringstream os;
+  doc.Dump(os);
+  const std::string dumped = os.str();
+  EXPECT_STREQ(
+      "id,name,age,grade\n"
+      "0,A,20,2.7\n"
+      "1,B,19,4.1\n"
+      "2,AB,9,4.12\n"
+      "3,ABCD,24,3.1415\n",
+      dumped.c_str());
 }
+
+}  // anonymous namespace

@@ -10,8 +10,8 @@ inline size_t Align64(size_t size) { return 64 * ((size + 63) / 64); }
 
 }  // namespace
 
-Document::Document(const std::vector<std::string> &field_names,
-                   const std::vector<FieldType> &field_types)
+Document::Document(const std::vector<std::string>& field_names,
+                   const std::vector<FieldType>& field_types)
 
     : field_names_(field_names),
       num_cols_(field_names.size()),
@@ -43,9 +43,9 @@ Document::Document(const std::vector<std::string> &field_names,
   }
 }
 
-void Document::Write(size_t row, size_t column, const char *str, size_t str_length) {
+void Document::Write(size_t row, size_t column, const char* str, size_t str_length) {
   const int row_idx_in_chunk = row - current_row_offset_in_chunk_;
-  const auto &column_info = column_infos_[column];
+  const auto& column_info = column_infos_[column];
   const auto chunk_offset = row_idx_in_chunk * actual_row_byte_size_ + column_info.offset;
   switch (column_info.type) {
   case FieldType::INT64: {
@@ -76,7 +76,7 @@ void Document::AddChunk(size_t num_rows) {
 
 size_t Document::NumRows() const {
   return std::accumulate(std::begin(buffer_), std::end(buffer_), size_t{0u},
-                         [](size_t num_rows, const DocumentMemoryChunk &chunk) {
+                         [](size_t num_rows, const DocumentMemoryChunk& chunk) {
                            return num_rows + chunk.num_rows;
                          });
 }
@@ -110,7 +110,7 @@ std::vector<int64_t> Document::GetAsInt64(const std::string& column) const {
   return column_result;
 }
 
-std::vector<std::string> Document::GetAsString(const std::string &column) const {
+std::vector<std::string> Document::GetAsString(const std::string& column) const {
   int column_index = -1;
   for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
     if (field_names_[idx] == column) {
@@ -123,11 +123,11 @@ std::vector<std::string> Document::GetAsString(const std::string &column) const 
     throw std::invalid_argument(std::string("no column with name ") + column);
   }
 
-  const auto &column_info = column_infos_[column_index];
+  const auto& column_info = column_infos_[column_index];
   std::vector<std::string> column_result(this->NumRows());
   const auto column_offset = column_info.offset;
   auto row_offset = 0u;
-  for (const auto &document_memory_chunk : buffer_) {
+  for (const auto& document_memory_chunk : buffer_) {
     auto current_chunk = document_memory_chunk.chunk.get();
     for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
       column_result[row + row_offset] =
@@ -139,7 +139,7 @@ std::vector<std::string> Document::GetAsString(const std::string &column) const 
   return column_result;
 }
 
-std::vector<double> Document::GetAsDouble(const std::string &column) const {
+std::vector<double> Document::GetAsDouble(const std::string& column) const {
   int column_index = -1;
   for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
     if (field_names_[idx] == column) {
@@ -152,11 +152,11 @@ std::vector<double> Document::GetAsDouble(const std::string &column) const {
     throw std::invalid_argument(std::string("no column with name ") + column);
   }
 
-  const auto &column_info = column_infos_[column_index];
+  const auto& column_info = column_infos_[column_index];
   std::vector<double> column_result(this->NumRows());
   const auto column_offset = column_info.offset;
   auto row_offset = 0u;
-  for (const auto &document_memory_chunk : buffer_) {
+  for (const auto& document_memory_chunk : buffer_) {
     auto current_chunk = document_memory_chunk.chunk.get();
     for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
       column_result[row + row_offset] =
@@ -166,6 +166,43 @@ std::vector<double> Document::GetAsDouble(const std::string &column) const {
   }
 
   return column_result;
+}
+
+void Document::Dump(std::ostream& os) const {
+  for (size_t i = 0; i < field_names_.size(); i++) {
+    if (i != 0)  {
+      os << ',';
+    }
+    os << field_names_[i];
+  }
+  os << '\n';
+  for (const auto& one_buffer : buffer_) {
+    const auto current_chunk = one_buffer.chunk.get();
+    for (size_t row_idx = 0; row_idx < one_buffer.num_rows; row_idx++) {
+      for (size_t column_idx = 0; column_idx < column_infos_.size(); column_idx++) {
+        if (column_idx != 0) {
+          os << ',';
+        }
+        const auto& column_info = column_infos_[column_idx];
+        const auto offset = row_idx * actual_row_byte_size_ +
+                            column_info.offset;
+        switch (column_info.type) {
+        case FieldType::INT64:
+          os << current_chunk->ReadInt64(offset);
+          break;
+        case FieldType::DOUBLE:
+          os << current_chunk->ReadDouble(offset);
+          break;
+        case FieldType::STRING:
+          os << current_chunk->ReadString(offset);
+          break;
+        default:
+          break;
+        }
+      }
+      os << '\n';
+    }
+  }
 }
 
 }  // namespace csv

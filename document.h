@@ -2,6 +2,7 @@
 #define __DOCUMENT_H__
 
 #include <memory>
+#include <ostream>
 #include <vector>
 
 #include "base.h"
@@ -19,6 +20,8 @@ public:
   std::vector<int64_t> GetAsInt64(const std::string& column) const;
   std::vector<std::string> GetAsString(const std::string& column) const;
   std::vector<double> GetAsDouble(const std::string& column) const;
+
+  void Dump(std::ostream& os) const;
 private:
   struct ColumnInfo {
     FieldType type;
