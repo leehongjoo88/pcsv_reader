@@ -39,6 +39,9 @@ public:
            static_cast<size_t>(*(buffer_ + offset + MemoryChunk::kMaxStringLength));
   }
 
+  template <typename T>
+  T Read(int offset) const;
+
   void Write(int offset, int64_t value) {
     std::memcpy(buffer_ + offset, &value, sizeof(int64_t));
   }
@@ -62,6 +65,21 @@ private:
   char *buffer_;
   size_t size_;
 };
+
+template <>
+inline int64_t MemoryChunk::Read<int64_t>(int offset) const {
+  return ReadInt64(offset);
+}
+
+template <>
+inline double MemoryChunk::Read<double>(int offset) const {
+  return ReadDouble(offset);
+}
+
+template <>
+inline std::string MemoryChunk::Read<std::string>(int offset) const {
+  return ReadString(offset);
+}
 
 }  // namespace csv
 

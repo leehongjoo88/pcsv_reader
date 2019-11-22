@@ -1,5 +1,7 @@
 #include "document.h"
 
+#include <omp.h>
+
 #include <numeric>
 
 namespace csv {
@@ -17,7 +19,8 @@ Document::Document(const std::vector<std::string>& field_names,
       num_cols_(field_names.size()),
       actual_row_byte_size_(Align64(GetTotalFieldTypeSize(field_types))),
       current_memory_chunk_(nullptr),
-      current_row_offset_in_chunk_(0) {
+      current_row_offset_in_chunk_(0),
+      num_threads_(1) {
   column_infos_.reserve(field_types.size());
   int offset = 0;
   for (const auto field_type : field_types) {
@@ -65,6 +68,51 @@ void Document::Write(size_t row, size_t column, const char* str, size_t str_leng
   }
 }
 
+template <typename T>
+void Document::Get(const std::string& column, std::vector<T>& column_result) const {
+  static_assert(std::is_same<T, int64_t>::value || std::is_same<T, double>::value ||
+                    std::is_same<T, std::string>::value,
+                "Given type must be one of int64_t, double, std::string");
+  assert(column_result.size() == this->NumRows());
+  int column_index = -1;
+  for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
+    if (field_names_[idx] == column) {
+      column_index = idx;
+      break;
+    }
+  }
+
+  if (column_index < 0) {
+    throw std::invalid_argument(std::string("no column with name ") + column);
+  }
+
+  const auto& column_info = column_infos_[column_index];
+  const auto column_offset = column_info.offset;
+  auto row_offset = 0u;
+  // use multi thread
+  if (num_threads_ > 1) {
+    for (const auto& document_memory_chunk : buffer_) {
+      auto current_chunk = document_memory_chunk.chunk.get();
+      omp_set_num_threads(num_threads_);
+#pragma omp parallel for
+      for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
+        column_result[row + row_offset] =
+            current_chunk->Read<T>(row * actual_row_byte_size_ + column_offset);
+      }
+      row_offset += document_memory_chunk.num_rows;
+    }
+  } else {
+    for (const auto& document_memory_chunk : buffer_) {
+      auto current_chunk = document_memory_chunk.chunk.get();
+      for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
+        column_result[row + row_offset] =
+            current_chunk->Read<T>(row * actual_row_byte_size_ + column_offset);
+      }
+      row_offset += document_memory_chunk.num_rows;
+    }
+  }
+}
+
 void Document::AddChunk(size_t num_rows) {
   std::unique_ptr<MemoryChunk> new_memory_chunk(
       new MemoryChunk(num_rows * actual_row_byte_size_));
@@ -82,95 +130,54 @@ size_t Document::NumRows() const {
 }
 
 std::vector<int64_t> Document::GetAsInt64(const std::string& column) const {
-  int column_index = -1;
-  for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
-    if (field_names_[idx] == column) {
-      column_index = idx;
-      break;
-    }
-  }
-
-  if (column_index < 0) {
-    throw std::invalid_argument(std::string("no column with name ") + column);
-  }
-
-  const auto& column_info = column_infos_[column_index];
   std::vector<int64_t> column_result(this->NumRows());
-  const auto column_offset = column_info.offset;
-  auto row_offset = 0u;
-  for (const auto& document_memory_chunk : buffer_) {
-    auto current_chunk = document_memory_chunk.chunk.get();
-    for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
-      column_result[row + row_offset] =
-          current_chunk->ReadInt64(row * actual_row_byte_size_ + column_offset);
-    }
-    row_offset += document_memory_chunk.num_rows;
-  }
-
+  this->Get<int64_t>(column, column_result);
   return column_result;
+}
+
+void Document::GetAsInt64(const std::string& column, std::vector<int64_t>& result) const {
+  if (result.size() != this->NumRows()) {
+    throw std::invalid_argument(
+        std::string("given output vector of size ") + std::to_string(result.size()) +
+        "doesn't match with row count " + std::to_string(this->NumRows()));
+  }
+  this->Get<int64_t>(column, result);
 }
 
 std::vector<std::string> Document::GetAsString(const std::string& column) const {
-  int column_index = -1;
-  for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
-    if (field_names_[idx] == column) {
-      column_index = idx;
-      break;
-    }
-  }
-
-  if (column_index < 0) {
-    throw std::invalid_argument(std::string("no column with name ") + column);
-  }
-
-  const auto& column_info = column_infos_[column_index];
   std::vector<std::string> column_result(this->NumRows());
-  const auto column_offset = column_info.offset;
-  auto row_offset = 0u;
-  for (const auto& document_memory_chunk : buffer_) {
-    auto current_chunk = document_memory_chunk.chunk.get();
-    for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
-      column_result[row + row_offset] =
-          current_chunk->ReadString(row * actual_row_byte_size_ + column_offset);
-    }
-    row_offset += document_memory_chunk.num_rows;
-  }
-
+  this->Get<std::string>(column, column_result);
   return column_result;
 }
 
+void Document::GetAsString(const std::string& column,
+                           std::vector<std::string>& result) const {
+  if (result.size() != this->NumRows()) {
+    throw std::invalid_argument(
+        std::string("given output vector of size ") + std::to_string(result.size()) +
+        "doesn't match with row count " + std::to_string(this->NumRows()));
+  }
+  this->Get<std::string>(column, result);
+}
+
 std::vector<double> Document::GetAsDouble(const std::string& column) const {
-  int column_index = -1;
-  for (int idx = 0; idx < static_cast<int>(field_names_.size()); idx++) {
-    if (field_names_[idx] == column) {
-      column_index = idx;
-      break;
-    }
-  }
-
-  if (column_index < 0) {
-    throw std::invalid_argument(std::string("no column with name ") + column);
-  }
-
-  const auto& column_info = column_infos_[column_index];
   std::vector<double> column_result(this->NumRows());
-  const auto column_offset = column_info.offset;
-  auto row_offset = 0u;
-  for (const auto& document_memory_chunk : buffer_) {
-    auto current_chunk = document_memory_chunk.chunk.get();
-    for (size_t row = 0u; row < document_memory_chunk.num_rows; ++row) {
-      column_result[row + row_offset] =
-          current_chunk->ReadDouble(row * actual_row_byte_size_ + column_offset);
-    }
-    row_offset += document_memory_chunk.num_rows;
-  }
-
+  this->Get<double>(column, column_result);
   return column_result;
+}
+
+void Document::GetAsDouble(const std::string& column, std::vector<double>& result) const {
+  if (result.size() != this->NumRows()) {
+    throw std::invalid_argument(
+        std::string("given output vector of size ") + std::to_string(result.size()) +
+        "doesn't match with row count " + std::to_string(this->NumRows()));
+  }
+  this->Get<double>(column, result);
 }
 
 void Document::Dump(std::ostream& os) const {
   for (size_t i = 0; i < field_names_.size(); i++) {
-    if (i != 0)  {
+    if (i != 0) {
       os << ',';
     }
     os << field_names_[i];
@@ -184,8 +191,7 @@ void Document::Dump(std::ostream& os) const {
           os << ',';
         }
         const auto& column_info = column_infos_[column_idx];
-        const auto offset = row_idx * actual_row_byte_size_ +
-                            column_info.offset;
+        const auto offset = row_idx * actual_row_byte_size_ + column_info.offset;
         switch (column_info.type) {
         case FieldType::INT64:
           os << current_chunk->ReadInt64(offset);

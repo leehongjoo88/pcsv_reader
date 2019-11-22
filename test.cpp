@@ -1,9 +1,8 @@
-#include "read.h"
-
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 
+#include "read.h"
 #include "stop_watch.h"
 
 std::vector<std::string> TokenizeFieldTypeString(const std::string& field_type_string) {
@@ -19,7 +18,7 @@ std::vector<std::string> TokenizeFieldTypeString(const std::string& field_type_s
 
     tokens.push_back(field_type_string.substr(pos, found - pos));
     pos = found + 1;
-  } while(true);
+  } while (true);
 
   return tokens;
 }
@@ -39,7 +38,8 @@ std::vector<csv::FieldType> ParseFieldType(const std::string& field_type_string)
     } else if (field_name == string_str) {
       types.push_back(csv::FieldType::STRING);
     } else {
-      throw std::runtime_error(std::string("input type string has wrong token ") + field_name);
+      throw std::runtime_error(std::string("input type string has wrong token ") +
+                               field_name);
     }
   }
 
@@ -61,17 +61,47 @@ int main(int argc, char** argv) {
   auto document = csv::ReadCSV(file_name, field_types);
   watch.End();
 
-  Stopwatch watch2("vector");
-  watch2.Start();
-  auto v = document.GetAsString("emp_length");
-  watch2.End();
+  watch.message = "read_columns";
 
-  watch2.Start();
-  auto iv = document.GetAsInt64("transaction_no");
-  watch2.End();
+  std::vector<int64_t> int_vector;
+  std::vector<double> double_vector;
+  std::vector<std::string> string_vector;
 
-  std::cout << v.size() << std::endl;
-  std::cout << v[0] << std::endl << v[1] << v[2] << std::endl;
+  watch.Start();
+  document.SetNumThreads(1);
+  auto field_names = document.FieldNames();
+  auto field_name_itr = std::begin(field_names);
+  auto field_type_itr = std::begin(field_types);
+  const auto field_type_end = std::end(field_types);
+  for (; field_type_itr != field_type_end; ++field_name_itr, ++field_type_itr) {
+    switch (*field_type_itr) {
+    case csv::FieldType::INT64:
+      if (int_vector.empty()) {
+        int_vector = document.GetAsInt64(*field_name_itr);
+      } else {
+        document.GetAsInt64(*field_name_itr, int_vector);
+      }
+      break;
+    case csv::FieldType::DOUBLE:
+      if (double_vector.empty()) {
+        double_vector = document.GetAsDouble(*field_name_itr);
+      } else {
+        document.GetAsDouble(*field_name_itr, double_vector);
+      }
+      break;
+
+    case csv::FieldType::STRING:
+      if (string_vector.empty()) {
+        string_vector = document.GetAsString(*field_name_itr);
+      } else {
+        document.GetAsString(*field_name_itr, string_vector);
+      }
+      break;
+    default:
+      break;
+    }
+  }
+  watch.End();
 
   return 0;
 }
